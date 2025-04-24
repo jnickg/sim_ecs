@@ -33,14 +33,14 @@ template <typename T> using maybe  = std::optional<T>;
 constexpr inline auto nothing      = std::nullopt;
 
 constexpr inline entity_t NO_ENTITY = 0; //< The null entity, used to indicate that an entity does not exist
-inline static entity_t new_entity()
+inline static entity_t create_entity()
 {
     static std::atomic<entity_t> id = 1;
     return id++;
 }
 
 constexpr inline system_t NO_SYSTEM = 0; //< The null system, used to indicate that a system does not exist
-inline static system_t new_system()
+inline static system_t create_system()
 {
     static std::atomic<system_t> id = 1;
     return id++;
@@ -52,7 +52,6 @@ inline static system_t new_system()
 
 struct ComponentBase
 {
-    maybe<entity_t> owner = nothing;         // The entity that owns this component
     time_t created_at     = clock_t::now();  //< The real-world time when the
                                              // component was created, for debugging
     time_t last_updated_at = clock_t::now(); //< The real-world time when the component was last
@@ -74,8 +73,7 @@ struct ComponentBase
     {
         std::stringstream ss;
 
-        ss << "ComponentBase(owner=" << owner.value_or(NO_ENTITY)
-           << ", created_at=" << created_at.time_since_epoch().count()
+        ss << "ComponentBase(created_at=" << created_at.time_since_epoch().count()
            << ", last_updated_at=" << last_updated_at.time_since_epoch().count()
            << ", last_updated_by=" << last_updated_by << ")";
 
@@ -117,11 +115,26 @@ inline std::ostream &operator<<(std::ostream &os, const maybe<handle<ComponentBa
     return os;
 }
 
-struct OwnedComponentBase : public ComponentBase
+struct OwnedComponent : public ComponentBase
 {
-    OwnedComponentBase(entity_t owner) { this->owner = owner; }
-    OwnedComponentBase()          = delete;
-    virtual ~OwnedComponentBase() = default;
+    entity_t owner = NO_ENTITY;         // The entity that owns this component
+
+    OwnedComponent(entity_t owner) { this->owner = owner; }
+    OwnedComponent()          = delete;
+    virtual ~OwnedComponent() = default;
+
+    virtual std::ostream &print(std::ostream &os) const override
+    {
+        std::stringstream ss;
+        std::stringstream ss_base;
+        ComponentBase::print(ss_base);
+
+        ss << "OwnedComponent(base=" << ss_base.str() << ", " << "owner=" << owner << ")";
+
+        os << ss.str();
+
+        return os;
+    }
 };
 
 /**
@@ -163,12 +176,12 @@ struct WorldTimeComponent : public ComponentBase
  * it can be updated based on the world time. This is useful for entities that
  * need to be updated
  */
-struct TimedEntityComponent : public OwnedComponentBase
+struct TimedEntityComponent : public OwnedComponent
 {
     bool running      = false; //< If the entity is running
     double time_scale = 1.0;   //< The time scale of the entity
 
-    TimedEntityComponent(entity_t world) : OwnedComponentBase{world} {}
+    TimedEntityComponent(entity_t world) : OwnedComponent{world} {}
     TimedEntityComponent()          = delete;
     virtual ~TimedEntityComponent() = default;
 
@@ -176,7 +189,7 @@ struct TimedEntityComponent : public OwnedComponentBase
     {
         std::stringstream ss;
         std::stringstream ss_base;
-        ComponentBase::print(ss_base);
+        OwnedComponent::print(ss_base);
 
         ss << "TimedEntityComponent(base=" << ss_base.str() << ", " << "running=" << running
            << ", time_scale=" << time_scale << ")";
@@ -366,6 +379,16 @@ class ComponentManager
         return nullptr;
     }
 
+    template<typename... Ts> std::tuple<handle<Ts>...> get_view(entity_t entity)
+    {
+        return std::make_tuple(get<Ts>(entity)...);
+    }
+
+    template<typename... Ts> bool has_view(entity_t entity)
+    {
+        return (... && has<Ts>(entity));
+    }
+
     std::vector<entity_t> get_all_entities() const { return std::vector<entity_t>(entities.begin(), entities.end()); }
 
     template <typename T> void remove(entity_t entity)
@@ -418,9 +441,22 @@ struct SystemManager
 
     system_t register_new(handle<SystemBase> system)
     {
-        auto system_id     = new_system();
+        auto system_id     = create_system();
         systems[system_id] = system;
         return system_id;
+    }
+
+    template<typename... Cs>
+    system_t new_system(std::string name,
+        system_state start_state,
+        typename GenericSystem<Cs...>::can_update_t can_update,
+        typename GenericSystem<Cs...>::component_retriever_t get_components,
+        typename GenericSystem<Cs...>::update_function_t update_components)
+    {
+        auto system = std::make_shared<GenericSystem<Cs...>>(can_update, get_components, update_components);
+        system->name = name;
+        system->state = start_state;
+        return register_new(system);
     }
 
     void add_dependency(system_t system, system_t dependency)
