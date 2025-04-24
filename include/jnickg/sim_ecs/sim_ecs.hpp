@@ -342,6 +342,9 @@ template <typename... Cs> struct GenericSystem : public SystemBase
 
 class ComponentManager
 {
+    inline static std::atomic<std::size_t> manager_id_counter;
+
+    std::size_t id = manager_id_counter++;
     std::unordered_set<entity_t> entities;
 
   public:
@@ -382,16 +385,17 @@ class ComponentManager
     template <typename T> std::unordered_map<entity_t, std::shared_ptr<T>> &get_all() { return get_map<T>(); }
 
   private:
-    template <typename T> static std::unordered_map<entity_t, std::shared_ptr<T>> &get_static_map()
+    template <typename T>
+    static std::unordered_map<entity_t, std::shared_ptr<T>> &get_static_map(std::size_t manager_id)
     {
-        static std::unordered_map<entity_t, std::shared_ptr<T>> map;
-        return map;
+        static std::unordered_map<std::size_t, std::unordered_map<entity_t, std::shared_ptr<T>>> map;
+        return map[manager_id];
     }
-    template <typename T> std::unordered_map<entity_t, std::shared_ptr<T>> &get_map() { return get_static_map<T>(); }
+    template <typename T> std::unordered_map<entity_t, std::shared_ptr<T>> &get_map() { return get_static_map<T>(id); }
 
     template <typename T> const std::unordered_map<entity_t, std::shared_ptr<T>> &get_map() const
     {
-        return get_static_map<T>();
+        return get_static_map<T>(id);
     }
 };
 
