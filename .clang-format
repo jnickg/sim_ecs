@@ -1,0 +1,31 @@
+# Google C/C++ Code Style settings
+# https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+# Author: Kehan Xue, kehan.xue (at) gmail.com
+
+Language: Cpp
+BasedOnStyle: Microsoft
+
+AlignAfterOpenBracket: DontAlign
+AlignArrayOfStructures: Right
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveShortCaseStatements:
+    Enabled: True
+AlignOperands: DontAlign
+AllowAllArgumentsOnNextLine: True
+AllowAllParametersOfDeclarationOnNextLine: True
+AllowShortCaseExpressionOnASingleLine: True
+AllowShortEnumsOnASingleLine: True
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: True
+BinPackArguments: False
+BinPackParameters: False
+BreakBeforeBinaryOperators: All
+BreakConstructorInitializers: BeforeComma
+ContinuationIndentWidth: 4
+IndentPPDirectives: BeforeHash
+InsertBraces: True
+InsertNewlineAtEOF: True
+LineEnding: LF
+PackConstructorInitializers: NextLine
